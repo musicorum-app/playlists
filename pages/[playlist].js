@@ -29,11 +29,46 @@ import DialogTitle from "@material-ui/core/DialogTitle";
 import DeezerLogo from '../assets/logos/deezer.svg'
 import SpotifyLogo from '../assets/logos/spotify.svg'
 import TestPresentationLogo from '../assets/logos/test-presentation.svg'
+import Rewind2020 from '../assets/presentations/2020_rewind.svg'
 import {API_URL} from '../vars.js'
 import DialogContentText from "@material-ui/core/DialogContentText";
 import DialogContent from "@material-ui/core/DialogContent";
 import DialogActions from "@material-ui/core/DialogActions";
 import LinearProgress from "@material-ui/core/LinearProgress";
+import styled from "styled-components";
+import IconButton from "@material-ui/core/IconButton";
+import PlayArrowIcon from '@material-ui/icons/PlayArrow';
+import PauseIcon from '@material-ui/icons/Pause';
+
+const ItemSecondaryText = styled.span`
+  font-size: 0.8rem;
+`
+
+const PlaylistItem = styled(ListItem)`
+  transition: background-color .2s;
+  border-radius: 4px;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+`
+
+const ItemInside = styled.div`
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+`
+
+const Flex = styled.div`
+  display: flex;
+  align-items: center;
+`
+
+const Banner = styled.div`
+  width: 100%;
+  background: ${p => p.color};
+  height: 98px;
+`
 
 const useStyles = makeStyles({
   topHeader: {
@@ -64,8 +99,8 @@ const useStyles = makeStyles({
     }
   },
   avatar: {
-    width: 60,
-    height: 60,
+    width: 52,
+    height: 52,
     boxShadow: '1px 1px 3px 0px #00000042',
     marginRight: 10,
     transition: 'box-shadow 0.4s',
@@ -89,16 +124,13 @@ const useStyles = makeStyles({
   items: {
     marginTop: 20
   },
-  banner: {
-    width: '100%',
-    background: '#ec407a',
-  },
   noWrap: {
     flexWrap: 'nowrap'
   },
   smallItem: {
-    paddingLeft: '0px',
-    paddingBottom: '0px'
+    paddingLeft: '8px',
+    paddingBottom: '6px',
+    paddingTop: '6px'
   },
   serviceLogo: {
     background: 'transparent',
@@ -110,7 +142,7 @@ const useStyles = makeStyles({
   }
 });
 
-const trackTypes = ['TOP_TRACK', 'LOVED_TRACK']
+const trackTypes = ['TOP_TRACKS', 'LOVED_TRACKS']
 
 const SPOTIFY_API = 'https://api.spotify.com/v1'
 const DEEZER_API = 'https://api.deezer.com'
@@ -125,6 +157,9 @@ export default function Playlist({playlist}) {
   const [userData, setUserData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [playlistId, setPlaylistId] = useState(null)
+
+  const [playing, setPlaying] = useState(null)
+  const [player, setPlayer] = useState(null)
 
   if (router.isFallback) {
     return <h1>Loading...</h1>
@@ -155,7 +190,7 @@ export default function Playlist({playlist}) {
         },
         body: JSON.stringify({
           name: playlist.name,
-          description: `${playlist.serviceDescription}`
+          description: `${playlist.service_description}`
         })
       }).then(r => r.json())
       console.log(spotifyPlaylist)
@@ -188,7 +223,7 @@ export default function Playlist({playlist}) {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          uris: playlist.items.filter(({spotifyId}) => !!spotifyId).map(({spotifyId}) => `spotify:track:${spotifyId}`)
+          uris: playlist.items.filter(({spotify}) => !!spotify).map(({spotify}) => `spotify:track:${spotify}`)
         })
       }).then(r => r.json())
 
@@ -223,6 +258,7 @@ export default function Playlist({playlist}) {
   }
 
   const handleSpotify = async () => {
+    console.log(API_URL)
     const {url} = await fetch(`${API_URL}/auth/spotify`).then(r => r.json())
     window.connect = ({token, user}) => {
       setUserData({
@@ -256,15 +292,47 @@ export default function Playlist({playlist}) {
     window.open(url, 'popup', 'width=400, height=600')
   }
 
+
+  const handlePlay = (item, index) => () => {
+    if (playing) {
+      if (playing === index) {
+        player.pause()
+        setPlaying(null)
+      } else {
+        player.pause()
+        player.src = item.preview
+        setPlaying(index)
+      }
+    } else {
+      if (player) {
+        player.src = item.preview
+        setPlaying(index)
+      } else {
+        const p = new Audio(item.preview)
+        p.addEventListener('canplaythrough', () => {
+          p.play()
+        })
+        p.addEventListener('ended', () => {
+          p.pause()
+          setPlaying(null)
+        })
+        setPlayer(p)
+        setPlaying(index)
+      }
+    }
+  }
+
   return (
     <Scaffold playlist={playlist}>
       <Container maxWidth="md">
         <Card variant="outlined">
           {
             !!playlist.presentation ? (
-              <div className={classes.banner}>
-                <TestPresentationLogo />
-              </div>
+              <Banner color={playlist.presentation === 'PT_TEST' ? '#ec407a' : '#FD0F57'}>
+                {
+                  playlist.presentation === '2020_REWIND' && <Rewind2020/>
+                }
+              </Banner>
             ) : ''
           }
           <CardContent>
@@ -375,15 +443,51 @@ export default function Playlist({playlist}) {
               </Typography>
               <List className={classes.fullWidth}>
                 {
-                  playlist.items.map(item => (
-                    <ListItem className={smallSize ? classes.smallItem : {}}>
-                      <ListItemAvatar>
-                        <Avatar variant="rounded" className={smallSize ? classes.smallAvatar : classes.avatar}>
-                          <img src={item.image} width={smallSize ? 44 : 60}/>
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText primary={item.name} secondary={item.artist}/>
-                    </ListItem>
+                  playlist.items.map((item, index) => (
+                    <PlaylistItem key={index} className={smallSize ? classes.smallItem : {}}>
+                      <ItemInside>
+                        <Flex>
+                          <ListItemAvatar>
+                            <Avatar variant="rounded" className={smallSize ? classes.smallAvatar : classes.avatar}>
+                              <img src={item.cover} width={smallSize ? 44 : 52}/>
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText primary={item.name}
+                                        secondary={<ItemSecondaryText>{item.artist}</ItemSecondaryText>}/>
+                        </Flex>
+                        <div>
+                          <Grid
+                            container
+                            direction="row-reverse"
+                            justify="space-between"
+                            alignItems="center"
+                            style={{height: '100%'}}
+                          >
+                            <Grid item>
+                              {
+                                item.preview && <IconButton size="small" onClick={handlePlay(item, index + 1)}>
+                                  {
+                                    playing && playing === (index + 1) ?
+                                      <PauseIcon/> : <PlayArrowIcon/>
+                                  }
+                                </IconButton>
+                              }
+                            </Grid>
+                            <Grid item>
+                              {
+                                item.duration && <Typography color="textSecondary" style={{
+                                  fontSize: 13
+                                }}>
+                                  {
+                                    moment.utc(item.duration).format('mm:ss')
+                                  }
+                                </Typography>
+                              }
+                            </Grid>
+                          </Grid>
+                        </div>
+                      </ItemInside>
+                    </PlaylistItem>
                   ))
                 }
               </List>
@@ -450,10 +554,12 @@ export default function Playlist({playlist}) {
                   <Button onClick={() => {
                     setUserData(null)
                     setOpenDialog(false)
-                  }} color="secondary">
+                  }} color="secondary"
+                    disabled={loading}
+                  >
                     Cancel
                   </Button>
-                  <Button onClick={createPlaylist} color="secondary" autoFocus>
+                  <Button onClick={createPlaylist} color="secondary" autoFocus disabled={loading}>
                     Save
                   </Button>
                 </DialogActions>
