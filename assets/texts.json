@@ -1,0 +1,13 @@
+{
+  "types": {
+    "TOP_TRACK": "Most listened tracks",
+    "LOVED_TRACK": "Loved tracks",
+    "TOP_ARTIST": "Most listened artists"
+  },
+  "presentations": {
+    "PR_TEST": {
+      "title": "Presentation test",
+      "text": "This is a test presentation."
+    }
+  }
+}
